@@ -363,3 +363,4 @@ ${emailText}`
 };
 
 export default SpamAnalyzer;
+export default LoginForm;
