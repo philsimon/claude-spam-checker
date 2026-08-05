@@ -1,0 +1,77 @@
+name: Dependabot Handling
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+
+jobs:
+  handle:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/head
+          fetch-depth: 0
+
+      - uses: dependabot/fetch-metadata@v2
+        id: metadata
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Try a clean install and build
+        id: build
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: |
+          npm install
+          npm run build --if-present
+        continue-on-error: true
+
+      - name: Auto-merge clean patch/minor updates
+        id: automerge
+        if: steps.build.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --squash "$PR_URL"
+
+      - name: Hand major or broken updates to Claude
+        if: steps.automerge.outcome != 'success'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          additional_permissions: |
+            actions: read
+          prompt: |
+            Dependabot opened this PR: bumping ${{ steps.metadata.outputs.dependency-names }}
+            from ${{ steps.metadata.outputs.previous-version }} to ${{ steps.metadata.outputs.new-version }}
+            (${{ steps.metadata.outputs.update-type }}).
+
+            A plain `npm install && npm run build` on this branch did not cleanly succeed and
+            auto-merge, either because it's a major version bump or because the build failed.
+            Investigate and fix it:
+
+            - Read the changelog or release notes for breaking changes.
+            - If this closes a security advisory, check whether the vulnerable code path is
+              actually reachable in this repo before assuming a fix is required.
+            - Make whatever code, config, or additional dependency changes the bump requires
+              (import paths, peer dependencies, cascading version bumps).
+            - Run the actual build and type-check commands and confirm they pass.
+            - If this is a UI-facing app, start the dev server and smoke-test the change in a
+              headless browser before merging.
+
+            If it checks out, commit your fixes to this branch and squash-merge the PR.
+            If you hit a real blocker you can't resolve, leave a comment on the PR explaining
+            exactly what's blocking it, and leave the PR open for manual review.
