@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { RouterProvider, createBrowserRouter, createHashRouter } from 'react-router-dom';
+import { RouterProvider } from 'react-router/dom';
+import { createBrowserRouter, createHashRouter } from 'react-router';
 import routes from 'virtual:generated-pages-react';
 import Layout from './components/layout';
 import './index.css';
