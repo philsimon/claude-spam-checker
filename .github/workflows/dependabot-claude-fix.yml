@@ -81,6 +81,9 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # claude-code-action@v1 refuses to run for bot actors unless the bot is
+          # named here. This job only ever runs on Dependabot-opened PRs.
+          allowed_bots: 'dependabot[bot]'
           additional_permissions: |
             actions: read
           prompt: |
